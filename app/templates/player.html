@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="/static/lib/socket.io.slim.js"></script>
+    <meta charset="utf-8">
+    <title>Input stream for player {{id}}</title>
+
+    <style>
+        html {
+            height: 100%;
+        }
+        body {
+            height: calc(100% - 16px);
+        }
+        .select {
+            margin-bottom: 20px;
+            font-size: xx-large;
+            font-weight: bolder;
+        }
+        #container {
+            margin: 0px auto;
+            height: calc(100% - 60px);
+        }
+        #videoSource{
+            font-size: xx-large;
+            font-weight: bolder;
+        }
+        #videoElement {
+            width: 500px;
+            height: 375px;
+            background-color: #666;
+        }
+        #img {
+            width: 100%;
+            height: 100%;
+            background: no-repeat scroll center center;
+            background-size: contain;
+        }
+    </style>
+</head>
+
+<body>
+<div class="select">
+    <label for="videoSource">Video source: </label>
+    <select id="videoSource">
+        <option selected>SELECT CAMERA</option>
+    </select>
+</div>
+<div id="container">
+    <video autoplay="true" id="videoElement" hidden></video>
+    <div id="img"></div>
+    <canvas style="display:none;"></canvas>
+</div>
+<script>
+    var base_url = "{{root_url}}";
+    var player_id = {{id}};
+
+    var video = document.querySelector("video");
+    var canvas = document.querySelector("canvas");
+    var videoSelect = document.querySelector('select#videoSource');
+    var image = document.querySelector('#img');
+
+    var interval;
+
+    canvas.width  = 256;
+    canvas.height = 256;
+
+    var ctx = canvas.getContext('2d');
+    var localMediaStream = null;
+
+    socket = io.connect(base_url + 'test');
+    socket.on('convert image', function(response) {
+        console.log(response['status'], response['msg'], response['probability'], response['label'])
+
+        if (response['status']){
+            snapshot();
+        }else{
+            setTimeout(snapshot, 1000*0.1);
+        }
+    });
+
+    var video_contraint = {
+        video: true
+        // video: {
+        //     facingMode: { exact: "environment" }
+        // }
+    };
+
+    function hasGetUserMedia() {
+        return !!(navigator.mediaDevices || navigator.getUserMedia ||
+            navigator.webkitGetUserMedia || navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia);
+    }
+
+    function selectVideoStream(){
+        return navigator.mediaDevices.getUserMedia({ video: {deviceId: videoSelect.value} })
+            .then(function (stream) {
+                video.srcObject = stream;
+                localMediaStream = stream;
+            }).then(function(){
+                snapshot()
+            })
+    }
+
+    function gotDevices(deviceInfos) {
+        for (i = 0; i !== deviceInfos.length; ++i) {
+            var deviceInfo = deviceInfos[i];
+            var option = document.createElement('option');
+            option.value = deviceInfo.deviceId;
+            if (deviceInfo.kind === 'videoinput') {
+                option.text = deviceInfo.label;
+                videoSelect.appendChild(option);
+            } else {
+                console.log('Some other kind of source/device: ', deviceInfo);
+            }
+        }
+
+        return new Promise(function (resolve, reject) { resolve()});
+    }
+
+    if (hasGetUserMedia()) {
+        navigator.mediaDevices.enumerateDevices().then(gotDevices);
+    } else {
+        alert('getUserMedia() is not supported in your browser');
+    }
+
+    video.addEventListener('click', snapshot, false);
+    videoSelect.onchange = selectVideoStream;
+
+    function snapshot() {
+        if (localMediaStream) {
+            ctx.drawImage(video, 0,0, 256, 256);
+            // "image/webp" works in Chrome.
+            // Other browsers will fall back to image/png.
+
+            socket.emit('send image', {
+                id: player_id,
+                img: canvas.toDataURL('image/png')
+            })
+
+            image.style.backgroundImage = "url(" +canvas.toDataURL('image/png') + ")";
+        }
+    }
+</script>
+</body>
+</html>
