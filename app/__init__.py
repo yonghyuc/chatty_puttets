@@ -7,4 +7,4 @@ app = Flask(__name__)
 CORS(app)
 
 api = Api(app)
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
