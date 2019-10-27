@@ -57,7 +57,7 @@ def save_image(message):
         'status': True,
         'msg': f'Successfully convert image',
         'probability': probability,
-        'label': idx},
+        'label': idx+1},
          broadcast=True)
 #
 #
